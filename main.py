@@ -1,6 +1,7 @@
 import pickle
 from itertools import combinations
 from random import shuffle
+import pandas as pd
 
 
 def generate_anagram_dict():
@@ -151,16 +152,62 @@ def evaluate_words(words):
 
     return word_score_dict
 
+
+class Cell:
+    def __init__(self, x, y):
+        self.xpos = x
+        self.ypos = y
+
+    def add_word(self, word, direction):
+
+        if direction == 'R':
+            self.word_h = word
+        elif direction == 'D':
+            self.word_v = word
+
+    def add_letter(self, letter):
+        self.letter = letter
+
+def generate_board(x=100,y=100):
+
+    df = pd.DataFrame(columns=range(-x,x), index=range(-y,y))
+    for x_pos in range (-x,x):
+        for y_pos in range(-y,y):
+            df.at[x_pos, y_pos] = Cell(x=x_pos, y=y_pos)  # Todo coords are wrong way here (ohwell?)
+
+    # TODO - dataframe needs to be filled with instances of Cells, with the x,y pos included within the obj
+    return df
+
+def place_word(df, word, x, y, dir):
+
+    if dir == 'R':
+        for offset, letter in enumerate(word):
+            cell = df.at[y, x+offset] #Todo coords are wrong way here (ohwell?)
+            cell.add_word(word=word, direction=dir)
+            cell.add_letter(letter=letter)
+    return df
+
+
+def print_board(board):
+    # TODO iterate through the board, and maybe create a new pandas array with the value, and print?
+
 if __name__ == '__main__':
     generate_anagram_dict()
     anagram_dict = load_anagrams_dict()
     tile_bank = generate_tile_bank()
     shuffle(tile_bank)
 
+    board = generate_board(x=10, y=10)
     hand, tile_bank = deal_starting_hand(tile_bank)
 
     starting_word, hand = get_starting_word(hand, anagram_dict)
+    board = place_word(board, word=starting_word, x=0, y=0, dir='R')
 
+    pd.set_option('display.width', None)
+
+    pd.set_option('display.max_columns', None)
+
+    print(board)
     print(starting_word, hand)
 
     for i in range(len(starting_word)):
