@@ -11,14 +11,14 @@ def generate_anagram_dict():
     for word in f:
         word = word.lower()
         if '-' not in word and "'" not in word:
-            if len(set(word) - lets) == 0 and 2 < len(word) < 9:
-                word = word.strip()
-                key = ''.join(sorted(word))
-                if key in d:
-                    if word not in d[key]:
-                        d[key].append(word)
-                else:
-                    d[key] = [word]
+            #if len(set(word) - lets) == 0:
+            word = word.strip()
+            key = ''.join(sorted(word))
+            if key in d:
+                if word not in d[key]:
+                    d[key].append(word)
+            else:
+                d[key] = [word]
     f.close()
 
     with open('anadict.pickle', 'wb') as handle:
@@ -81,9 +81,9 @@ def lambda_helper1(word):
 def lambda_helper2(word, letter):
     return word+letter
 
-def get_starting_word(hand, anagram_dict, starting_length=10, anagram_letter=None):
+def get_word(hand, anagram_dict, starting_length=10, anagram_letter=None):
 
-    for length in range(starting_length, 2, -1):
+    for length in range(starting_length, 0, -1):
         combos = list(combinations(sorted(hand), length))
         output_list = list(map(lambda_helper1, combos))
         if anagram_letter is not None:
@@ -93,12 +93,15 @@ def get_starting_word(hand, anagram_dict, starting_length=10, anagram_letter=Non
 
         viable_letters = list(set(output_list) & set(anagram_dict.keys()))
 
+
         viable_words = []
         for letters in viable_letters:
             for word in anagram_dict[letters]:
                 viable_words.append(word)
 
         if len(viable_words):
+
+            print(len(viable_words))
 
             word_scores = evaluate_words(viable_words)
 
@@ -153,10 +156,52 @@ def evaluate_words(words):
     return word_score_dict
 
 
+class Board:
+    def __init__(self,x=10,y=10):
+        board = pd.DataFrame(columns=range(-x, x), index=range(-y, y))
+        for x_pos in range(-x, x):
+            for y_pos in range(-y, y):
+                board.at[x_pos, y_pos] = Cell(x=x_pos, y=y_pos)  # Todo coords are wrong way here (ohwell?)
+
+        # TODO - dataframe needs to be filled with instances of Cells, with the x,y pos included within the obj
+        self.board = board
+        self.letter_dict = {}
+
+    def place_word(self, word, x, y, dir):
+        if dir == 'R':
+            for offset, letter in enumerate(word):
+                cell = self.board.at[y, x + offset]  # Todo coords are wrong way here (ohwell?)
+                cell.add_word(word=word, direction=dir)
+                cell.add_letter(letter=letter)
+
+                self.letter_dict[(x + offset, y)] = letter
+
+        if dir == 'D':
+            for offset, letter in enumerate(word):
+                cell = self.board.at[y + offset, x]  # Todo coords are wrong way here (ohwell?)
+                cell.add_word(word=word, direction=dir)
+                cell.add_letter(letter=letter)
+
+                self.letter_dict[(x, y + offset)] = letter
+
+
+    def print_board(self):
+        for index, row in self.board.iterrows():
+            row_values = []
+            for i in range(-20, 20):
+                if row[i].letter is None:
+                    row_values.append(' ')
+                else:
+                    row_values.append(row[i].letter)
+            print(row_values)
+
 class Cell:
     def __init__(self, x, y):
         self.xpos = x
         self.ypos = y
+        self.letter = None
+        self.word_h = None
+        self.word_v = None
 
     def add_word(self, word, direction):
 
@@ -168,28 +213,6 @@ class Cell:
     def add_letter(self, letter):
         self.letter = letter
 
-def generate_board(x=100,y=100):
-
-    df = pd.DataFrame(columns=range(-x,x), index=range(-y,y))
-    for x_pos in range (-x,x):
-        for y_pos in range(-y,y):
-            df.at[x_pos, y_pos] = Cell(x=x_pos, y=y_pos)  # Todo coords are wrong way here (ohwell?)
-
-    # TODO - dataframe needs to be filled with instances of Cells, with the x,y pos included within the obj
-    return df
-
-def place_word(df, word, x, y, dir):
-
-    if dir == 'R':
-        for offset, letter in enumerate(word):
-            cell = df.at[y, x+offset] #Todo coords are wrong way here (ohwell?)
-            cell.add_word(word=word, direction=dir)
-            cell.add_letter(letter=letter)
-    return df
-
-
-def print_board(board):
-    # TODO iterate through the board, and maybe create a new pandas array with the value, and print?
 
 if __name__ == '__main__':
     generate_anagram_dict()
@@ -197,25 +220,73 @@ if __name__ == '__main__':
     tile_bank = generate_tile_bank()
     shuffle(tile_bank)
 
-    board = generate_board(x=10, y=10)
+    Board = Board(x=20, y=20)
+
     hand, tile_bank = deal_starting_hand(tile_bank)
 
-    starting_word, hand = get_starting_word(hand, anagram_dict)
-    board = place_word(board, word=starting_word, x=0, y=0, dir='R')
+    starting_word, hand = get_word(hand, anagram_dict, starting_length=5)
 
-    pd.set_option('display.width', None)
+    Board.place_word(word=starting_word, x=0, y=0, dir='R')
+    Board.print_board()
+    #pd.set_option('display.width', None)
 
-    pd.set_option('display.max_columns', None)
+    #pd.set_option('display.max_columns', None)
 
-    print(board)
-    print(starting_word, hand)
+    #print(board)
+    #print(starting_word, hand)
 
-    for i in range(len(starting_word)):
-        try:
-            word, hand = get_starting_word(hand, anagram_dict, starting_length=5, anagram_letter = starting_word[i])
-            if word is not None:
-                print(word, hand, starting_word[i])
-        except:
-            print('error')
-            pass
+    #for i in range(len(starting_word)):
+
+    complete = False
+    while not complete:
+        print('looping')
+        placed_word = False
+
+        for cord, letter in Board.letter_dict.items():
+
+            cell = Board.board[cord[0]][cord[1]]
+            print('')
+            # Check to see if you should try place a word here
+            if cell.word_h is not None and cell.word_v is not None:
+                print('dont test this letter!')
+
+                pass  # letter already has two word
+            elif [Board.board[cord[0]+1][cord[1]+1].letter, Board.board[cord[0]-1][cord[1]+1].letter,
+                  Board.board[cord[0]-1][cord[1]+1].letter,Board.board[cord[0]-1][cord[1]-1].letter] != [None] * 4:
+                print('dont test this letter! (nearby word')
+                pass  #
+
+            else:
+
+                anagram_letter = letter
+                word, hand = get_word(hand, anagram_dict, starting_length=5, anagram_letter = anagram_letter)
+
+                if word is not None:
+                    print(word, hand, anagram_letter)
+                    #Board.place_word(word=starting_word, x=0, y=0, dir='R')
+                    offset = word.find(anagram_letter)  #this only does first occourance
+
+                    if cell.word_h is None:
+                        # Place it horizontally
+                        x0 = cord[0] - offset
+                        y0 = cord[1]
+                        Board.place_word(word=word, x=x0, y=y0, dir='R')
+                        Board.print_board()
+
+                    elif cell.word_v is None:
+                        # place vertically
+                        x0 = cord[0]
+                        y0 = cord[1] - offset
+                        Board.place_word(word=word, x=x0, y=y0, dir='D')
+                        Board.print_board()
+
+                    print('breaking')
+                    placed_word = True
+                    break
+
+        if not placed_word or len(hand)==0:
+            complete=True
     print("exiting")
+
+    print('final hand')
+    print(hand)
