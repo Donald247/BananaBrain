@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def generate_anagram_dict():
-    f = open('words_full.txt')
+    f = open('words.txt')
     d = {}
     lets = set('abcdefghijklmnopqrstuvwxyz\n')
     for word in f:
@@ -81,7 +81,7 @@ def lambda_helper1(word):
 def lambda_helper2(word, letter):
     return word+letter
 
-def get_word(hand, anagram_dict, starting_length=10, anagram_letter=None):
+def get_word(hand, anagram_dict, starting_length=10, anagram_letter=None, viable_len=None):
 
     for length in range(starting_length, 0, -1):
         combos = list(combinations(sorted(hand), length))
@@ -99,7 +99,23 @@ def get_word(hand, anagram_dict, starting_length=10, anagram_letter=None):
             for word in anagram_dict[letters]:
                 viable_words.append(word)
 
+
+        # Need to check with viable_len here
+
+        if viable_len and len(viable_words):
+            print("prior words {}".format(len(viable_words)))
+            print(viable_words)
+            import numpy as np
+            letter_index_b = np.array([item.find(anagram_letter) <= viable_len[0] for item in viable_words])
+            letter_index_a = np.array(
+                [len(item) - item.find(anagram_letter) - 1 <= viable_len[1] for item in viable_words])
+            to_keep = (letter_index_b & letter_index_a).tolist()
+            viable_words = [d for (d, remove) in zip(viable_words, to_keep) if remove]
+            print("after cull words {}".format(len(viable_words)))
+            print(viable_words)
+
         if len(viable_words):
+
 
             print(len(viable_words))
 
@@ -159,12 +175,17 @@ def evaluate_words(words):
 class Board:
     def __init__(self,x=10,y=10):
         board = pd.DataFrame(columns=range(-x, x), index=range(-y, y))
+
+        char_board = pd.DataFrame(columns=range(-x, x), index=range(-y, y))
+
         for x_pos in range(-x, x):
             for y_pos in range(-y, y):
                 board.at[x_pos, y_pos] = Cell(x=x_pos, y=y_pos)  # Todo coords are wrong way here (ohwell?)
-
+                char_board.at[x_pos, y_pos] = " "
         # TODO - dataframe needs to be filled with instances of Cells, with the x,y pos included within the obj
+
         self.board = board
+        self.char_board = char_board
         self.letter_dict = {}
 
     def place_word(self, word, x, y, dir):
@@ -175,7 +196,7 @@ class Board:
                 cell.add_letter(letter=letter)
 
                 self.letter_dict[(x + offset, y)] = letter
-
+                self.char_board.at[y, x + offset] = letter
         if dir == 'D':
             for offset, letter in enumerate(word):
                 cell = self.board.at[y + offset, x]  # Todo coords are wrong way here (ohwell?)
@@ -183,6 +204,7 @@ class Board:
                 cell.add_letter(letter=letter)
 
                 self.letter_dict[(x, y + offset)] = letter
+                self.char_board.at[y + offset, x] = letter
 
 
     def print_board(self):
@@ -213,6 +235,9 @@ class Cell:
     def add_letter(self, letter):
         self.letter = letter
 
+
+def compute_viable_length(string, char=" "):
+    return len(string) - len(string.lstrip(char))
 
 if __name__ == '__main__':
     generate_anagram_dict()
@@ -246,20 +271,80 @@ if __name__ == '__main__':
 
             cell = Board.board[cord[0]][cord[1]]
             print('')
+
+            viable_len = (10,10)
+            if cell.word_h is not None and cell.word_v is None:
+                print("placing vertical")
+                print(letter)
+
+
+                main_line_b = "".join(Board.char_board.loc[:cord[1]-1, cord[0]].tolist()[::-1])
+                main_line_a = "".join(Board.char_board.loc[cord[1]+1:, cord[0]].tolist())
+
+                side_1_b = "".join(Board.char_board.loc[:cord[1]-1,cord[0]-1].tolist()[::-1])
+                side_1_a = "".join(Board.char_board.loc[cord[1]+1:,cord[0]-1].tolist())
+
+                side_2_b = "".join(Board.char_board.loc[:cord[1]-1,cord[0]+1].tolist()[::-1])
+                side_2_a = "".join(Board.char_board.loc[cord[1]+1:,cord[0]+1].tolist())
+
+            if cell.word_v is not None and cell.word_h is None:
+                print("placing hoz")
+                print(letter)
+                main_line_b = "".join(Board.char_board.loc[cord[1], :cord[0]-1].tolist()[::-1])
+                main_line_a = "".join(Board.char_board.loc[cord[1], cord[0]+1:].tolist())
+
+                side_1_b = "".join(Board.char_board.loc[cord[1]+1, :cord[0]-1].tolist()[::-1])
+                side_1_a = "".join(Board.char_board.loc[cord[1]+1, cord[0]+1:].tolist())
+
+                side_2_b = "".join(Board.char_board.loc[cord[1]-1, :cord[0]-1].tolist()[::-1])
+                side_2_a = "".join(Board.char_board.loc[cord[1]-1, cord[0]+1:].tolist())
+
+
+            main = (max(compute_viable_length(main_line_b)-1,0), max(compute_viable_length(main_line_a)-1, 0))
+            side_1 = (compute_viable_length(side_1_b), compute_viable_length(side_1_a)) # these sides need to have an offset!
+            side_2 = (compute_viable_length(side_2_b), compute_viable_length(side_2_a))
+
+            viable_len = (min(main[0], side_1[0], side_2[0]), (min(main[1], side_1[1], side_2[1])))
+            print(viable_len)
+            #print('wait')
+
+            # Determine the viable word sizes here:
+
+            # Determine if placing up or right
+            # Get list of all characters along that line, and either side (create a pandas array with chars to make this quick)
+
+
+            # This can probs be done with some smart list searches for non "" across the entire row/col
+            # for the main line (with letter a as focus):
+                # ["","o","","","a","","","","","o"] -> x a x x x
+
+            # for the side lines (with letter a as focus on the center line):
+                # ["","g","","","a","","","g","",""] -> x x a x x
+                # different since they can touch on diagonals
+
+            # Then somehow combine these:
+                # x a x x x -> 01000 (1b, 3)
+                # x x a x x -> 00100  (2b, 2a)
+                # x x x x x a -> 000001  (5b, 0a)
+                # min(1,2,3)b, min(3,2,0)a = 1b, 0a?
+
+            # Now somehow filter all words that fit with this 1b 0a template
+            # Only pick from these subset of words that wont cause cross overs!
+
             # Check to see if you should try place a word here
             if cell.word_h is not None and cell.word_v is not None:
                 print('dont test this letter!')
 
                 pass  # letter already has two word
-            elif [Board.board[cord[0]+1][cord[1]+1].letter, Board.board[cord[0]-1][cord[1]+1].letter,
-                  Board.board[cord[0]-1][cord[1]+1].letter,Board.board[cord[0]-1][cord[1]-1].letter] != [None] * 4:
-                print('dont test this letter! (nearby word')
-                pass  #
+            #elif [Board.board[cord[0]+1][cord[1]+1].letter, Board.board[cord[0]+1][cord[1]-1].letter,
+            #      Board.board[cord[0]-1][cord[1]+1].letter,Board.board[cord[0]-1][cord[1]-1].letter] != [None] * 4:
+            #    print('dont test this letter! (nearby word')
+            #    pass  #
 
             else:
 
                 anagram_letter = letter
-                word, hand = get_word(hand, anagram_dict, starting_length=5, anagram_letter = anagram_letter)
+                word, hand = get_word(hand, anagram_dict, starting_length=5, anagram_letter = anagram_letter, viable_len = viable_len)
 
                 if word is not None:
                     print(word, hand, anagram_letter)
