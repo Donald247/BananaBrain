@@ -222,6 +222,24 @@ class Board:
                     row_values.append(row[i])
             print(row_values)
 
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        from pandas.plotting import table
+
+        ax = plt.subplot(111, frame_on=False)  # no visible frame
+        ax.xaxis.set_visible(False)  # hide the x axis
+        ax.yaxis.set_visible(False)  # hide the y axis
+
+        table(ax, self.char_board)  # where df is your data frame
+
+        # render dataframe as html
+        pd.set_option('display.max_colwidth', 100)
+        html = self.char_board.to_html(col_space=17, justify='justify-all')
+
+        # write html to file
+        text_file = open("index.html", "w")
+        text_file.write(html)
+        text_file.close()
 
     def deal_hand(self, size=21, peel=True):
         self.hand = []
@@ -381,7 +399,7 @@ def attempt_to_place(Board):
                             #print("I placed the word {}".format(word))
                             #print("Remaining hand is {}".format(Board.hand))
                             #print("Now I would try place another word")
-                            Board.print_board()
+                            #Board.print_board()
 
                             viable_board = attempt_to_place(Board)
 
