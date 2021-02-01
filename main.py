@@ -5,6 +5,7 @@ import pandas as pd
 import copy
 import numpy as np
 import sys
+import time
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -222,22 +223,13 @@ class Board:
                     row_values.append(row[i])
             print(row_values)
 
-        import matplotlib.pyplot as plt
-        import pandas as pd
-        from pandas.plotting import table
-
-        ax = plt.subplot(111, frame_on=False)  # no visible frame
-        ax.xaxis.set_visible(False)  # hide the x axis
-        ax.yaxis.set_visible(False)  # hide the y axis
-
-        table(ax, self.char_board)  # where df is your data frame
-
+    def export_html(self):
         # render dataframe as html
         pd.set_option('display.max_colwidth', 100)
         html = self.char_board.to_html(col_space=17, justify='justify-all')
 
         # write html to file
-        text_file = open("index.html", "w")
+        text_file = open("complete_run.html", "w")
         text_file.write(html)
         text_file.close()
 
@@ -248,7 +240,7 @@ class Board:
         if peel:
             self.turn_counter += 1
             self.drawn_letters.append(self.hand[0])
-            print(self.turn_counter)
+            #print(self.turn_counter)
             from pygame import mixer
 
             mixer.init()  # you must initialize the mixer
@@ -335,6 +327,7 @@ def determine_viable_len(Board,cord):
 
 def attempt_to_place(Board):
 
+    turn_counter = 0
     placed_word = False
     board_save = copy.deepcopy(Board)
 
@@ -372,83 +365,96 @@ def attempt_to_place(Board):
 
                 # Instead iterating over the word list (vs best word)
                 if word_list is not None:
+                    viable_board = True
 
                     for word,value in word_list:
-                        offset = word.find(anagram_letter)  # this only does first occourance
-                        viable_board = True
 
-                        placed_word = False
+                        if viable_board:
 
-                        if word_h is None:
-                            # Place it horizontally
-                            x0 = cord[0] - offset
-                            y0 = cord[1]
-                            Board.place_word(word=word, x=x0, y=y0, dir='R')
-                            Board.update_hand(word=word, anagram_letter=anagram_letter)
-                            placed_word = True
-
-                        elif word_v is None:
-                            # place vertically
-                            x0 = cord[0]
-                            y0 = cord[1] - offset
-                            Board.place_word(word=word, x=x0, y=y0, dir='D')
-                            Board.update_hand(word=word, anagram_letter=anagram_letter)
-                            placed_word = True
-
-                        if placed_word and len(Board.hand) > 0:
-                            #print("I placed the word {}".format(word))
-                            #print("Remaining hand is {}".format(Board.hand))
-                            #print("Now I would try place another word")
-                            #Board.print_board()
-
-                            viable_board = attempt_to_place(Board)
-
-                        elif placed_word and len(Board.hand) == 0:
-                            #print("I placed the word {}".format(word))
-                            #print("Remaining hand is empty, see {}!".format(Board.hand))
-                            #print("Now I would pick up another letter")
-                            Board.print_board()
-
-                            Board.deal_hand(1)
-                            #print("Remaining hand is {}".format(Board.hand))
-                            print(Board.turn_counter)
-
-                            viable_board = attempt_to_place(Board)
-                        if not viable_board:
-                            #print("Removing the word: {}".format(word))
-
-
-                            if Board.turn_counter != board_save.turn_counter:
-                                print(Board.turn_counter, board_save.turn_counter)
-                                print('update hand with drawn letters')
-                                board_save.hand += Board.drawn_letters[board_save.turn_counter:Board.turn_counter]
-                                print('added {} to hand (drew these letters!)'.format(Board.drawn_letters[board_save.turn_counter:Board.turn_counter]))
-                                print("hand is: {}".format(board_save.hand))
-                                board_save.turn_counter = Board.turn_counter
-                                board_save.bank = Board.bank
-                                board_save.drawn_letters = Board.drawn_letters
-                                # TODO - add in the drawn letters here
-                                word_len_counter = 0
-                                letter_counter = 0
-
-                            Board = copy.deepcopy(board_save)
-                            #Board.print_board()
-
-
-                            # TODO - also need to start searching from the start again (start this loop over)
+                            offset = word.find(anagram_letter)  # this only does first occourance
 
                             placed_word = False
 
+                            if word_h is None:
+                                # Place it horizontally
+                                x0 = cord[0] - offset
+                                y0 = cord[1]
+                                Board.place_word(word=word, x=x0, y=y0, dir='R')
+                                Board.update_hand(word=word, anagram_letter=anagram_letter)
+                                placed_word = True
+
+                            elif word_v is None:
+                                # place vertically
+                                x0 = cord[0]
+                                y0 = cord[1] - offset
+                                Board.place_word(word=word, x=x0, y=y0, dir='D')
+                                Board.update_hand(word=word, anagram_letter=anagram_letter)
+                                placed_word = True
+
+                            if placed_word and len(Board.hand) > 0:
+                                #print("I placed the word {}".format(word))
+                                #print("Remaining hand is {}".format(Board.hand))
+                                #print("Now I would try place another word")
+                                #Board.print_board()
+
+                                viable_board, turn_counter, Board = attempt_to_place(Board)
+
+                            elif placed_word and len(Board.hand) == 0:
+                                #print("I placed the word {}".format(word))
+                                #print("Remaining hand is empty, see {}!".format(Board.hand))
+                                #print("Now I would pick up another letter")
+                                Board.print_board()
+
+                                Board.deal_hand(1)
+                                print("I drew {}".format(Board.hand))
+                                print(Board.turn_counter)
+                                viable_board, turn_counter, Board = attempt_to_place(Board)
+
+                                if Board.turn_counter > 50:
+                                    print(Board.turn_counter)
+                                    print(time.time() - t0)
+                                    Board.export_html()
+                                    sys.exit()
+
+                            if not viable_board:
+                                #print("Removing the word: {}".format(word))
+
+
+                                if turn_counter > board_save.turn_counter:
+                                    #print(Board.turn_counter, board_save.turn_counter)
+                                    #print('update hand with drawn letters')
+                                    board_save.hand += Board.drawn_letters[board_save.turn_counter:turn_counter]
+                                    #print('added {} to hand (drew these letters!)'.format(Board.drawn_letters[board_save.turn_counter:Board.turn_counter]))
+                                    #print("hand is: {}".format(board_save.hand))
+                                    board_save.turn_counter = turn_counter
+                                    board_save.bank = Board.bank
+                                    board_save.drawn_letters = Board.drawn_letters
+                                    # TODO - add in the drawn letters here
+                                    word_len_counter = 0
+                                    letter_counter = 0
+
+                                Board = copy.deepcopy(board_save)
+                                #Board.print_board()
+
+
+                                # TODO - also need to start searching from the start again (start this loop over)
+
+                                placed_word = False
+
     if not placed_word:
         #print("I couldn't place any words")
-        #print("Now I would undo my previous placement and try again!")
+        #print("Now I  undo my previous placement and try again!")
         #Board.deal_hand(1)
-        return False
+        return False, Board.turn_counter, Board
     else:
         print('completed the game, exiting?')
         return True
 
 if __name__ == '__main__':
+    global t0
+    t0 = time.time()
+    global turn_check
+    turn_check = 0
     generate_anagram_dict()
     anagram_dict = load_anagrams_dict()
 
